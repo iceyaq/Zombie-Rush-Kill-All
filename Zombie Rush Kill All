@@ -1,0 +1,127 @@
+-- Enable KillAll functionality using both _G and getgenv()
+_G.KillAll = true
+getgenv().KillAll = true
+
+-- Function to safely execute a block of code with xpcall
+local function safeExecute(func)
+    local success, result = xpcall(func, function(err)
+        warn("Error occurred: " .. tostring(err))
+        return err
+    end)
+    return success and result or nil
+end
+
+-- Create a randomized delay function to avoid detection
+local function randomDelay(min, max)
+    local delayTime = math.random(min * 100, max * 100) / 100
+    wait(delayTime)
+end
+
+-- Function to kill all zombies
+local function killAllZombies()
+    randomDelay(0.1, 0.5)  -- Random delay before executing
+
+    local zombiesFolder = safeExecute(function()
+        return workspace:WaitForChild("Zombies")  -- Ensure the folder exists
+    end)
+
+    if zombiesFolder then
+        for _, zombie in pairs(zombiesFolder:GetChildren()) do
+            if zombie:FindFirstChild("Humanoid") then
+                pcall(function()
+                    randomDelay(0.05, 0.2)  -- Random delay between killing each zombie
+                    zombie.Humanoid.Health = 0  -- Set zombie health to 0 safely
+                end)
+            end
+        end
+    else
+        warn("Zombies folder not found in workspace.")
+    end
+end
+
+-- Function to display a notification
+local function showNotification(text)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "Notification",
+        Text = text,
+        Duration = 5,
+    })
+end
+
+-- Dynamic function name generation to obscure the script
+local function generateFunctionName()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    local name = ""
+    for _ = 1, math.random(5, 10) do
+        name = name .. chars:sub(math.random(1, #chars), math.random(1, #chars))
+    end
+    return name
+end
+
+-- Ensure the script is placed in StarterPlayerScripts
+local function ensurePlacement()
+    local playerScripts = game:GetService("StarterPlayer"):WaitForChild("StarterPlayerScripts", 10)
+    if not playerScripts:FindFirstChild("Zombie Rush Kill All") then
+        local scriptClone = script:Clone()
+        scriptClone.Name = "Zombie Rush Kill All"
+        scriptClone.Parent = playerScripts
+    else
+        warn("Script is already placed in StarterPlayerScripts.")
+    end
+end
+
+-- Function to reset KillAll actions and restart the script
+local function resetAndRestart()
+    print("Resetting actions due to level up or new weapon.")
+    _G.KillAll = false
+    getgenv().KillAll = false  -- Disable the KillAll temporarily
+    wait(0.5)  -- Short delay before re-enabling
+    _G.KillAll = true
+    getgenv().KillAll = true  -- Re-enable the KillAll functionality
+    print("Restarted KillAll functionality.")
+end
+
+-- Monitor tools with dynamic function name
+local monitorTools = generateFunctionName()  -- Generate a random function name
+
+-- Define the monitorTools function under a random name
+_G[monitorTools] = function()
+    randomDelay(0.1, 0.3)  -- Random delay before monitoring tools
+
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    -- Trigger when a tool is equipped
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and _G.KillAll and getgenv().KillAll then
+            killAllZombies()
+            print(child.Name .. " equipped, killing all zombies.")
+        end
+    end)
+
+    -- Trigger when a tool is unequipped
+    character.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") and _G.KillAll and getgenv().KillAll then
+            randomDelay(0.1, 0.3)  -- Random delay before processing unequip
+            print(child.Name .. " unequipped, stopping zombie kills.")
+        end
+    end)
+
+    -- Monitor for level up or weapon change
+    player:GetPropertyChangedSignal("leaderstats"):Connect(function()
+        resetAndRestart()  -- Reset actions and restart KillAll when leaderstats change (indicating level up)
+    end)
+
+    player.Backpack.ChildAdded:Connect(function(tool)
+        if tool:IsA("Tool") then
+            resetAndRestart()  -- Reset actions and restart KillAll when a new tool is added (new weapon)
+        end
+    end)
+end
+
+-- Initialize the script safely and dynamically
+safeExecute(function()
+    ensurePlacement()  -- Ensure the script is placed in StarterPlayerScripts
+    _G[monitorTools]()  -- Start monitoring tools
+    showNotification("discord - R74ac")  -- Display the notification
+end)
